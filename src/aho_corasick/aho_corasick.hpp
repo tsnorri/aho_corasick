@@ -307,6 +307,7 @@ namespace aho_corasick {
 	private:
 		size_t                         d_depth;
 		ptr                            d_root;
+		ptr                            d_parent;
 		std::map<CharType, unique_ptr> d_success;
 		ptr                            d_failure;
 		string_collection              d_emits;
@@ -317,6 +318,7 @@ namespace aho_corasick {
 		state(size_t depth)
 			: d_depth(depth)
 			, d_root(depth == 0 ? this : nullptr)
+			, d_parent(nullptr)
 			, d_success()
 			, d_failure(nullptr)
 			, d_emits() {}
@@ -333,6 +335,7 @@ namespace aho_corasick {
 			auto next = next_state_ignore_root_state(character);
 			if (next == nullptr) {
 				next = new state<CharType>(d_depth + 1);
+				next->set_parent(this);
 				d_success[character].reset(next);
 			}
 			return next;
@@ -358,6 +361,10 @@ namespace aho_corasick {
 		ptr failure() const { return d_failure; }
 
 		void set_failure(ptr fail_state) { d_failure = fail_state; }
+
+		ptr parent() const { return d_parent; }
+
+		void set_parent(ptr parent_state) { d_parent = parent_state; }
 
 		std::size_t goto_transition_count() const { return d_success.size(); }
 
