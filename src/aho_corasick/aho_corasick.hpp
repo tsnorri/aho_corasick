@@ -41,6 +41,8 @@ namespace aho_corasick {
 		size_t d_end;
 
 	public:
+		enum { max_pos = std::numeric_limits <size_t>::max() };
+
 		interval(size_t start, size_t end)
 			: d_start(start)
 			, d_end(end) {}
@@ -116,15 +118,15 @@ namespace aho_corasick {
 			}
 
 			size_t determine_median(const interval_collection& intervals) const {
-				int start = -1;
-				int end = -1;
+				size_t start = interval::max_pos;
+				size_t end = interval::max_pos;
 				for (const auto& i : intervals) {
-					int cur_start = i.get_start();
-					int cur_end = i.get_end();
-					if (start == -1 || cur_start < start) {
+					size_t cur_start = i.get_start();
+					size_t cur_end = i.get_end();
+					if (start == interval::max_pos || cur_start < start) {
 						start = cur_start;
 					}
-					if (end == -1 || cur_end > end) {
+					if (end == interval::max_pos || cur_end > end) {
 						end = cur_end;
 					}
 				}
@@ -243,7 +245,7 @@ namespace aho_corasick {
 
 	public:
 		emit()
-			: interval(-1, -1)
+			: interval(interval::max_pos, interval::max_pos)
 			, d_keyword() {}
 
 		emit(size_t start, size_t end, string_type keyword, unsigned index)
@@ -252,7 +254,7 @@ namespace aho_corasick {
 
 		string_type get_keyword() const { return string_type(d_keyword); }
 		unsigned get_index() const { return d_index; }
-		bool is_empty() const { return (get_start() == -1 && get_end() == -1); }
+		bool is_empty() const { return (get_start() == interval::max_pos && get_end() == interval::max_pos); }
 	};
 
 	// class token
@@ -481,7 +483,7 @@ namespace aho_corasick {
 		token_collection tokenise(string_type text) {
 			token_collection tokens;
 			auto collected_emits = parse_text(text);
-			size_t last_pos = -1;
+			size_t last_pos = interval::max_pos;
 			for (const auto& e : collected_emits) {
 				if (e.get_start() - last_pos > 1) {
 					tokens.push_back(create_fragment(e, text, last_pos));
