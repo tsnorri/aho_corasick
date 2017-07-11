@@ -351,9 +351,13 @@ namespace aho_corasick {
 
 		string_collection get_emits() const { return d_emits; }
 
+		void clear_emits() { d_emits.clear(); }
+
 		ptr failure() const { return d_failure; }
 
 		void set_failure(ptr fail_state) { d_failure = fail_state; }
+
+		std::size_t goto_transition_count() const { return d_success.size(); }
 
 		state_collection get_states() const {
 			state_collection result;
@@ -401,12 +405,14 @@ namespace aho_corasick {
 			bool d_allow_overlaps;
 			bool d_only_whole_words;
 			bool d_case_insensitive;
+			bool d_allow_substrings;
 
 		public:
 			config()
 				: d_allow_overlaps(true)
 				, d_only_whole_words(false)
-				, d_case_insensitive(false) {}
+				, d_case_insensitive(false)
+				, d_allow_substrings(true) {}
 
 			bool is_allow_overlaps() const { return d_allow_overlaps; }
 			void set_allow_overlaps(bool val) { d_allow_overlaps = val; }
@@ -416,6 +422,9 @@ namespace aho_corasick {
 
 			bool is_case_insensitive() const { return d_case_insensitive; }
 			void set_case_insensitive(bool val) { d_case_insensitive = val; }
+
+			bool is_allow_substrings() const { return d_allow_substrings; }
+			void set_allow_substrings(bool val) { d_allow_substrings = val; }
 		};
 
 	private:
@@ -444,6 +453,11 @@ namespace aho_corasick {
 
 		basic_trie& only_whole_words() {
 			d_config.set_only_whole_words(true);
+			return (*this);
+		}
+
+		basic_trie& remove_substrings() {
+			d_config.set_allow_substrings(false);
 			return (*this);
 		}
 
@@ -551,7 +565,28 @@ namespace aho_corasick {
 
 		void check_construct_failure_states() {
 			if (!d_constructed_failure_states) {
+				if (!d_config.is_allow_substrings())
+					remove_prefixes();
+
 				construct_failure_states();
+			}
+		}
+
+		void remove_prefixes() {
+			// If a final state has a goto transition, it represents a prefix of another string.
+			std::queue<state_ptr_type> q;
+			q.push(d_root.get());
+
+			while (!q.empty())
+			{
+				auto cur_state(q.front());
+				if (cur_state->goto_transition_count() && cur_state->get_emits().size())
+					cur_state->clear_emits();
+
+				for (auto state_ptr : cur_state->get_states())
+					q.push(state_ptr);
+				
+				q.pop();
 			}
 		}
 
@@ -570,12 +605,27 @@ namespace aho_corasick {
 					q.push(target_state);
 
 					state_ptr_type trace_failure_state = cur_state->failure();
-					while (trace_failure_state->next_state(transition) == nullptr) {
-						trace_failure_state = trace_failure_state->failure();
+					while (true)
+					{
+						while (trace_failure_state->next_state(transition) == nullptr) {
+							trace_failure_state = trace_failure_state->failure();
+						}
+						state_ptr_type new_failure_state = trace_failure_state->next_state(transition);
+
+						// If substrings are not allowed in the automaton and a final state was reached
+						// with the transition, make the state non-final and find the next possible
+						// failure state.
+						if ((!d_config.is_allow_substrings()) && new_failure_state->get_emits().size())
+						{
+							new_failure_state->clear_emits();
+							trace_failure_state = trace_failure_state->failure();
+							continue;
+						}
+
+						target_state->set_failure(new_failure_state);
+						target_state->add_emit(new_failure_state->get_emits());
+						break;
 					}
-					state_ptr_type new_failure_state = trace_failure_state->next_state(transition);
-					target_state->set_failure(new_failure_state);
-					target_state->add_emit(new_failure_state->get_emits());
 				}
 				q.pop();
 			}
