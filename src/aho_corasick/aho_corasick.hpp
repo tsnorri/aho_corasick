@@ -496,6 +496,27 @@ namespace aho_corasick {
 			}
 		}
 
+		void get_final_states_in_bfs_order(std::dequeue<state_ptr_type> &dst) const {
+			std::queue<state_ptr_type> q;
+			q.push(d_root.get());
+
+			while (!q.empty())
+			{
+				auto cur_state(q.front());
+				if (cur_state->get_emits().size())
+				{
+					assert(d_config.is_allow_substrings() || 0 == cur_state->goto_transition_count());
+					assert(0 == dst.size() || dst.back()->less_than_bfs_order(*cur_state));
+					dst.push(cur_state);
+				}
+				
+				for (auto state_ptr : cur_state->get_states())
+					q.push(state_ptr);
+
+				q.pop();
+			}
+		}
+
 		token_collection tokenise(string_type text) {
 			token_collection tokens;
 			auto collected_emits = parse_text(text);
