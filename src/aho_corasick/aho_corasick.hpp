@@ -306,6 +306,7 @@ namespace aho_corasick {
 
 	private:
 		size_t                         d_depth;
+		size_t                         d_idx;
 		ptr                            d_root;
 		ptr                            d_parent;
 		std::map<CharType, unique_ptr> d_success;
@@ -317,6 +318,7 @@ namespace aho_corasick {
 
 		state(size_t depth)
 			: d_depth(depth)
+			, d_idx(0)
 			, d_root(depth == 0 ? this : nullptr)
 			, d_parent(nullptr)
 			, d_success()
@@ -366,7 +368,14 @@ namespace aho_corasick {
 
 		void set_parent(ptr parent_state) { d_parent = parent_state; }
 
+		size_t index() const { return d_idx; }
+
+		void set_index(size_t idx) { d_idx = idx; }
+
 		std::size_t goto_transition_count() const { return d_success.size(); }
+
+		bool less_than_bfs_order(state const &other) const { return d_idx < other.d_idx; }
+		bool greater_than_bfs_order(state const &other) const { return !less_than_bfs_order(other); }
 
 		state_collection get_states() const {
 			state_collection result;
@@ -439,7 +448,7 @@ namespace aho_corasick {
 	private:
 		std::unique_ptr<state_type> d_root;
 		config                      d_config;
-		bool                        d_constructed_failure_states;
+		bool                        d_postprocessed;
 		unsigned                    d_num_keywords = 0;
 
 	public:
@@ -448,7 +457,7 @@ namespace aho_corasick {
 		basic_trie(const config& c)
 			: d_root(new state_type())
 			, d_config(c)
-			, d_constructed_failure_states(false) {}
+			, d_postprocessed(false) {}
 
 		basic_trie& case_insensitive() {
 			d_config.set_case_insensitive(true);
@@ -505,7 +514,7 @@ namespace aho_corasick {
 		}
 
 		emit_collection parse_text(string_type text) {
-			check_construct_failure_states();
+			check_postprocess();
 			size_t pos = 0;
 			state_ptr_type cur_state = d_root.get();
 			emit_collection collected_emits;
@@ -572,12 +581,35 @@ namespace aho_corasick {
 			return result;
 		}
 
-		void check_construct_failure_states() {
-			if (!d_constructed_failure_states) {
+		void check_postprocess() {
+			if (!d_postprocessed) {
+				assign_indices();
+
 				if (!d_config.is_allow_substrings())
 					remove_prefixes();
 
 				construct_failure_states();
+				d_postprocessed = true;
+			}
+		}
+
+		void assign_indices()
+		{
+			// Set state indices in BFS order.
+			std::queue<state_ptr_type> q;
+			q.push(d_root.get());
+
+			size_t i(0);
+			while (!q.empty())
+			{
+				auto cur_state(q.front());
+				cur_state->set_index(i);
+				
+				for (auto state_ptr : cur_state->get_states())
+					q.push(state_ptr);
+
+				q.pop();
+				++i;
 			}
 		}
 
@@ -605,7 +637,6 @@ namespace aho_corasick {
 				depth_one_state->set_failure(d_root.get());
 				q.push(depth_one_state);
 			}
-			d_constructed_failure_states = true;
 
 			while (!q.empty()) {
 				auto cur_state = q.front();
