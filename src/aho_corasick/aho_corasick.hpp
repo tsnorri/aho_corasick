@@ -479,7 +479,7 @@ namespace aho_corasick {
 			return (*this);
 		}
 
-		void insert(string_type keyword) {
+		state_ptr_type insert(string_type keyword) {
 			if (keyword.empty())
 				return;
 			state_ptr_type cur_state = d_root.get();
@@ -487,6 +487,7 @@ namespace aho_corasick {
 				cur_state = cur_state->add_state(ch);
 			}
 			cur_state->add_emit(keyword, d_num_keywords++);
+			return cur_state;
 		}
 
 		template<class InputIterator>
