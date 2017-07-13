@@ -484,7 +484,7 @@ namespace aho_corasick {
 
 		state_ptr_type insert(string_type keyword) {
 			if (keyword.empty())
-				return;
+				return d_root.get();
 			state_ptr_type cur_state = d_root.get();
 			for (const auto& ch : keyword) {
 				cur_state = cur_state->add_state(ch);
