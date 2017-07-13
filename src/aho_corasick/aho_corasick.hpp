@@ -502,8 +502,10 @@ namespace aho_corasick {
 
 		size_t num_keywords() const { return d_num_keywords; }
 		size_t num_states() const { return d_state_count; }
+		
+		void get_final_states_in_bfs_order(std::deque<state_ptr_type> &dst) {
+			check_postprocess();
 
-		void get_final_states_in_bfs_order(std::deque<state_ptr_type> &dst) const {
 			std::queue<state_ptr_type> q;
 			q.push(d_root.get());
 
