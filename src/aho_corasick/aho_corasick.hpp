@@ -24,6 +24,7 @@
 #define AHO_CORASICK_HPP
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <deque>
 #include <map>
