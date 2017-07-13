@@ -514,7 +514,7 @@ namespace aho_corasick {
 				{
 					assert(d_config.is_allow_substrings() || 0 == cur_state->goto_transition_count());
 					assert(0 == dst.size() || dst.back()->less_than_bfs_order(*cur_state));
-					dst.push(cur_state);
+					dst.push_back(cur_state);
 				}
 				
 				for (auto state_ptr : cur_state->get_states())
