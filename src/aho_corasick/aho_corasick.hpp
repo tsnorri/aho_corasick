@@ -450,6 +450,7 @@ namespace aho_corasick {
 		config                      d_config;
 		bool                        d_postprocessed;
 		unsigned                    d_num_keywords = 0;
+		size_t						d_state_count = 0;
 
 	public:
 		basic_trie(): basic_trie(config()) {}
@@ -496,6 +497,9 @@ namespace aho_corasick {
 				insert(*it);
 			}
 		}
+
+		size_t num_keywords() const { return d_num_keywords; }
+		size_t num_states() const { return d_state_count; }
 
 		void get_final_states_in_bfs_order(std::dequeue<state_ptr_type> &dst) const {
 			std::queue<state_ptr_type> q;
@@ -633,6 +637,8 @@ namespace aho_corasick {
 				q.pop();
 				++i;
 			}
+
+			d_state_count = i;
 		}
 
 		void remove_prefixes() {
