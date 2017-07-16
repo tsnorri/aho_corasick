@@ -489,8 +489,14 @@ namespace aho_corasick {
 			for (const auto& ch : keyword) {
 				cur_state = cur_state->add_state(ch);
 			}
-			cur_state->add_emit(keyword, d_num_keywords++);
-			return cur_state;
+			
+			if (0 == cur_state->get_emits().size() || d_config.is_allow_substrings())
+			{
+				cur_state->add_emit(keyword, d_num_keywords++);
+				return cur_state;
+			}
+
+			return nullptr;
 		}
 
 		template<class InputIterator>
@@ -655,7 +661,11 @@ namespace aho_corasick {
 			while (!q.empty())
 			{
 				auto cur_state(q.front());
-				if (cur_state->goto_transition_count() && cur_state->get_emits().size())
+				auto const emit_count(cur_state->get_emits().size());
+				
+				assert(emit_count < 2);
+				
+				if (cur_state->goto_transition_count() && emit_count)
 					cur_state->clear_emits();
 
 				for (auto state_ptr : cur_state->get_states())
