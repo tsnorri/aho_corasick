@@ -511,7 +511,8 @@ namespace aho_corasick {
 		
 		state_ptr_type get_root() const { return d_root.get(); }
 
-		void get_final_states_in_bfs_order(std::deque<state_ptr_type> &dst) {
+		template <typename T>
+		void get_final_states_in_bfs_order(T &dst) {
 			check_postprocess();
 
 			std::queue<state_ptr_type> q;
@@ -575,6 +576,18 @@ namespace aho_corasick {
 			return emit_collection(collected_emits);
 		}
 
+		void check_postprocess() {
+			if (!d_postprocessed) {
+				assign_indices();
+
+				if (!d_config.is_allow_substrings())
+					remove_prefixes();
+
+				construct_failure_states();
+				d_postprocessed = true;
+			}
+		}
+
 	private:
 		token_type create_fragment(const typename token_type::emit_type& e, string_ref_type text, size_t last_pos) const {
 			auto start = last_pos + 1;
@@ -617,18 +630,6 @@ namespace aho_corasick {
 				result = cur_state->next_state(c);
 			}
 			return result;
-		}
-
-		void check_postprocess() {
-			if (!d_postprocessed) {
-				assign_indices();
-
-				if (!d_config.is_allow_substrings())
-					remove_prefixes();
-
-				construct_failure_states();
-				d_postprocessed = true;
-			}
 		}
 
 		void assign_indices()
