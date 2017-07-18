@@ -36,6 +36,13 @@
 #include <vector>
 
 namespace aho_corasick {
+	
+	struct map_template
+	{
+		template <typename Key, typename Value>
+		using map_type = std::map<Key, Value>;
+	};
+	
 
 	// class interval
 	class interval {
@@ -294,24 +301,25 @@ namespace aho_corasick {
 	};
 
 	// class state
-	template<typename CharType>
+	template<typename CharType, template<typename, typename> class TransitionMap>
 	class state {
 	public:
-		typedef state<CharType>*                 ptr;
-		typedef std::unique_ptr<state<CharType>> unique_ptr;
-		typedef std::basic_string<CharType>      string_type;
-		typedef std::basic_string<CharType>&     string_ref_type;
-		typedef std::pair<string_type, unsigned> key_index;
-		typedef std::set<key_index>              string_collection;
-		typedef std::vector<ptr>                 state_collection;
-		typedef std::vector<CharType>            transition_collection;
+		typedef state*                              ptr;
+		typedef std::unique_ptr<state>              unique_ptr;
+		typedef std::basic_string<CharType>         string_type;
+		typedef std::basic_string<CharType>&        string_ref_type;
+		typedef std::pair<string_type, unsigned>    key_index;
+		typedef std::set<key_index>                 string_collection;
+		typedef std::vector<ptr>                    state_collection;
+		typedef std::vector<CharType>               transition_collection;
+		typedef TransitionMap<CharType, unique_ptr> transition_map;
 
 	private:
 		size_t                         d_depth;
 		size_t                         d_idx;
 		ptr                            d_root;
 		ptr                            d_parent;
-		std::map<CharType, unique_ptr> d_success;
+		transition_map                 d_success;
 		ptr                            d_failure;
 		string_collection              d_emits;
 
@@ -338,7 +346,7 @@ namespace aho_corasick {
 		ptr add_state(CharType character) {
 			auto next = next_state_ignore_root_state(character);
 			if (next == nullptr) {
-				next = new state<CharType>(d_depth + 1);
+				next = new state(d_depth + 1);
 				next->set_parent(this);
 				d_success[character].reset(next);
 			}
@@ -408,18 +416,18 @@ namespace aho_corasick {
 		}
 	};
 
-	template<typename CharType>
+	template<typename CharType, template<typename, typename> class TransitionMap = map_template::map_type>
 	class basic_trie {
 	public:
 		using string_type = std::basic_string < CharType > ;
 		using string_ref_type = std::basic_string<CharType>&;
 
-		typedef state<CharType>         state_type;
-		typedef state<CharType>*        state_ptr_type;
-		typedef token<CharType>         token_type;
-		typedef emit<CharType>          emit_type;
-		typedef std::vector<token_type> token_collection;
-		typedef std::vector<emit_type>  emit_collection;
+		typedef state<CharType, TransitionMap> state_type;
+		typedef state_type*                    state_ptr_type;
+		typedef token<CharType>                token_type;
+		typedef emit<CharType>                 emit_type;
+		typedef std::vector<token_type>        token_collection;
+		typedef std::vector<emit_type>         emit_collection;
 
 		class config {
 			bool d_allow_overlaps;
