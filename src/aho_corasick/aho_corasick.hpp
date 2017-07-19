@@ -357,7 +357,8 @@ namespace aho_corasick {
 
 	private:
 		size_t                         d_depth;
-		size_t                         d_idx;
+		uint32_t                       d_idx;
+		uint32_t                       d_string_idx;
 		ptr                            d_root;
 		ptr                            d_parent;
 		transition_map                 d_success;
@@ -370,6 +371,7 @@ namespace aho_corasick {
 		state(size_t depth)
 			: d_depth(depth)
 			, d_idx(0)
+			, d_string_idx(0)
 			, d_root(depth == 0 ? this : nullptr)
 			, d_parent(nullptr)
 			, d_success()
@@ -421,7 +423,11 @@ namespace aho_corasick {
 
 		size_t index() const { return d_idx; }
 
-		void set_index(size_t idx) { d_idx = idx; }
+		void set_index(uint32_t idx) { d_idx = idx; }
+
+		size_t string_index() const { return d_string_idx; }
+
+		void set_string_index(uint32_t idx) { d_string_idx = idx; }
 
 		std::size_t goto_transition_count() const { return d_success.size(); }
 
