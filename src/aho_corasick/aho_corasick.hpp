@@ -352,7 +352,7 @@ namespace aho_corasick {
 		typedef std::basic_string<CharType>         string_type;
 		typedef std::basic_string<CharType>&        string_ref_type;
 		typedef std::pair<string_type, unsigned>    key_index;
-		typedef std::set<key_index>                 string_collection;
+		typedef std::vector<key_index>              string_collection;
 		typedef TransitionMap<CharType, unique_ptr> transition_map;
 
 	private:
@@ -397,7 +397,7 @@ namespace aho_corasick {
 		size_t get_depth() const { return d_depth; }
 
 		void add_emit(string_ref_type keyword, unsigned index) {
-			d_emits.insert(std::make_pair(keyword, index));
+			d_emits.emplace_back(keyword, index);
 		}
 
 		void add_emit(const string_collection& emits) {
