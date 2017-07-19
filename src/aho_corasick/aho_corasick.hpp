@@ -469,13 +469,15 @@ namespace aho_corasick {
 			bool d_only_whole_words;
 			bool d_case_insensitive;
 			bool d_allow_substrings;
+			bool d_store_states_in_bfs_order;
 
 		public:
 			config()
 				: d_allow_overlaps(true)
 				, d_only_whole_words(false)
 				, d_case_insensitive(false)
-				, d_allow_substrings(true) {}
+				, d_allow_substrings(true)
+				, d_store_states_in_bfs_order(false) {}
 
 			bool is_allow_overlaps() const { return d_allow_overlaps; }
 			void set_allow_overlaps(bool val) { d_allow_overlaps = val; }
@@ -488,6 +490,9 @@ namespace aho_corasick {
 
 			bool is_allow_substrings() const { return d_allow_substrings; }
 			void set_allow_substrings(bool val) { d_allow_substrings = val; }
+			
+			bool is_store_states_in_bfs_order() const { return d_store_states_in_bfs_order; }
+			void set_store_states_in_bfs_order(bool val) { d_store_states_in_bfs_order = val; }
 		};
 
 	private:
@@ -496,6 +501,8 @@ namespace aho_corasick {
 		bool                        d_postprocessed;
 		unsigned                    d_num_keywords = 0;
 		size_t                      d_state_count = 0;
+		std::vector<state_ptr_type> d_states_in_bfs_order{};
+		std::vector<state_ptr_type> d_final_states_in_bfs_order{};
 
 	public:
 		basic_trie(): basic_trie(config()) {}
@@ -522,6 +529,11 @@ namespace aho_corasick {
 
 		basic_trie& remove_substrings() {
 			d_config.set_allow_substrings(false);
+			return (*this);
+		}
+		
+		basic_trie& store_states_in_bfs_order() {
+			d_config.set_store_states_in_bfs_order(true);
 			return (*this);
 		}
 
@@ -554,30 +566,9 @@ namespace aho_corasick {
 		
 		state_ptr_type get_root() const { return d_root.get(); }
 		void reset_root() { d_root.reset(new state_type()); }
-
-		template <typename T>
-		void get_final_states_in_bfs_order(T &dst) {
-			check_postprocess();
-
-			std::queue<state_ptr_type> q;
-			q.push(d_root.get());
-
-			while (!q.empty())
-			{
-				auto cur_state(q.front());
-				if (cur_state->get_emits().size())
-				{
-					assert(d_config.is_allow_substrings() || 0 == cur_state->goto_transition_count());
-					assert(0 == dst.size() || dst.back()->less_than_bfs_order(*cur_state));
-					dst.push_back(cur_state);
-				}
-				
-				for (auto state_ptr : cur_state->get_states())
-					q.push(state_ptr);
-
-				q.pop();
-			}
-		}
+		
+		std::vector<state_ptr_type> const &get_states_in_bfs_order() const { return d_states_in_bfs_order; }
+		std::vector<state_ptr_type> const &get_final_states_in_bfs_order() const { return d_final_states_in_bfs_order; }
 
 		token_collection tokenise(string_type text) {
 			token_collection tokens;
@@ -626,8 +617,20 @@ namespace aho_corasick {
 
 				if (!d_config.is_allow_substrings())
 					remove_prefixes();
-
+				
 				construct_failure_states();
+				
+				// construct_failure_states clears emits; store final states
+				// only after doing that.
+				if (d_config.is_store_states_in_bfs_order())
+				{
+					for (auto const cur_state : d_states_in_bfs_order)
+					{
+						if (cur_state->get_emits().size())
+							d_final_states_in_bfs_order.push_back(cur_state);
+					}
+				}
+
 				d_postprocessed = true;
 			}
 		}
@@ -689,6 +692,9 @@ namespace aho_corasick {
 				cur_state->freeze();
 				cur_state->set_index(i);
 				
+				if (d_config.is_store_states_in_bfs_order())
+					d_states_in_bfs_order.push_back(cur_state);
+				
 				for (auto state_ptr : cur_state->get_states())
 					q.push(state_ptr);
 
@@ -698,26 +704,39 @@ namespace aho_corasick {
 
 			d_state_count = i;
 		}
+		
+		void remove_prefixes_from_state(state_ptr_type cur_state)
+		{
+			auto const emit_count(cur_state->get_emits().size());
+		
+			assert(emit_count < 2);
+		
+			if (cur_state->goto_transition_count() && emit_count)
+				cur_state->clear_emits();
+		}
 
 		void remove_prefixes() {
 			// If a final state has a goto transition, it represents a prefix of another string.
-			std::queue<state_ptr_type> q;
-			q.push(d_root.get());
-
-			while (!q.empty())
+			if (d_config.is_store_states_in_bfs_order())
 			{
-				auto cur_state(q.front());
-				auto const emit_count(cur_state->get_emits().size());
-				
-				assert(emit_count < 2);
-				
-				if (cur_state->goto_transition_count() && emit_count)
-					cur_state->clear_emits();
+				assert(!d_states_in_bfs_order.empty());
+				for (auto const cur_state : d_states_in_bfs_order)
+					remove_prefixes_from_state(cur_state);
+			}
+			else
+			{
+				std::queue<state_ptr_type> q;
+				q.push(d_root.get());
 
-				for (auto state_ptr : cur_state->get_states())
-					q.push(state_ptr);
+				while (!q.empty())
+				{
+					auto cur_state(q.front());
+					remove_prefixes_from_state(cur_state);
+					for (auto state_ptr : cur_state->get_states())
+						q.push(state_ptr);
 				
-				q.pop();
+					q.pop();
+				}
 			}
 		}
 
