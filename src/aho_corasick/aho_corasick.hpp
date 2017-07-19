@@ -37,10 +37,49 @@
 
 namespace aho_corasick {
 	
-	struct map_template
+	template <typename CharType, typename UniquePtr>
+	class transition_map
 	{
-		template <typename Key, typename Value>
-		using map_type = std::map<Key, Value>;
+	public:
+		typedef typename UniquePtr::pointer		ptr;
+		typedef std::map<CharType, UniquePtr>	map_type;
+		typedef typename map_type::size_type	size_type;
+		
+	protected:
+		map_type d_map;
+		
+	public:
+		void set_transition(CharType character, ptr next)
+		{
+			d_map[character].reset(next);
+		}
+		
+		size_type size() const { return d_map.size(); }
+		void freeze() {}
+		
+		bool find(CharType character, ptr &result) const {
+			auto it = d_map.find(character);
+			if (it != d_map.end()) {
+				result = it->second.get();
+				return true;
+			}
+			
+			return false;
+		}
+		
+		template <typename T>
+		void get_states(T &result) const {
+			for (auto it = d_map.cbegin(); it != d_map.cend(); ++it) {
+				result.push_back(it->second.get());
+			}
+		}
+		
+		template <typename T>
+		void get_transitions(T &result) const {
+			for (auto it = d_map.cbegin(); it != d_map.cend(); ++it) {
+				result.push_back(it->first);
+			}
+		}
 	};
 	
 
@@ -348,7 +387,7 @@ namespace aho_corasick {
 			if (next == nullptr) {
 				next = new state(d_depth + 1);
 				next->set_parent(this);
-				d_success[character].reset(next);
+				d_success.set_transition(character, next);
 			}
 			return next;
 		}
@@ -386,37 +425,33 @@ namespace aho_corasick {
 
 		bool less_than_bfs_order(state const &other) const { return d_idx < other.d_idx; }
 		bool greater_than_bfs_order(state const &other) const { return !less_than_bfs_order(other); }
+		
+		void freeze() { d_success.freeze(); }
 
 		state_collection get_states() const {
 			state_collection result;
-			for (auto it = d_success.cbegin(); it != d_success.cend(); ++it) {
-				result.push_back(it->second.get());
-			}
-			return state_collection(result);
+			d_success.get_states(result);
+			return result;
 		}
 
 		transition_collection get_transitions() const {
 			transition_collection result;
-			for (auto it = d_success.cbegin(); it != d_success.cend(); ++it) {
-				result.push_back(it->first);
-			}
-			return transition_collection(result);
+			d_success.get_transitions(result);
+			return result;
 		}
 
 	private:
 		ptr next_state(CharType character, bool ignore_root_state) const {
 			ptr result = nullptr;
-			auto found = d_success.find(character);
-			if (found != d_success.end()) {
-				result = found->second.get();
-			} else if (!ignore_root_state && d_root != nullptr) {
-				result = d_root;
-			}
+			auto const found = d_success.find(character, result);
+			if (!found && !ignore_root_state && d_root != nullptr)
+				return d_root;
+			
 			return result;
 		}
 	};
 
-	template<typename CharType, template<typename, typename> class TransitionMap = map_template::map_type>
+	template<typename CharType, template<typename, typename> class TransitionMap = transition_map>
 	class basic_trie {
 	public:
 		using string_type = std::basic_string < CharType > ;
@@ -460,7 +495,7 @@ namespace aho_corasick {
 		config                      d_config;
 		bool                        d_postprocessed;
 		unsigned                    d_num_keywords = 0;
-		size_t						d_state_count = 0;
+		size_t                      d_state_count = 0;
 
 	public:
 		basic_trie(): basic_trie(config()) {}
@@ -518,6 +553,7 @@ namespace aho_corasick {
 		size_t num_states() const { return d_state_count; }
 		
 		state_ptr_type get_root() const { return d_root.get(); }
+		void reset_root() { d_root.reset(new state_type()); }
 
 		template <typename T>
 		void get_final_states_in_bfs_order(T &dst) {
@@ -650,6 +686,7 @@ namespace aho_corasick {
 			while (!q.empty())
 			{
 				auto cur_state(q.front());
+				cur_state->freeze();
 				cur_state->set_index(i);
 				
 				for (auto state_ptr : cur_state->get_states())
