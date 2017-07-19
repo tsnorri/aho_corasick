@@ -44,6 +44,8 @@ namespace aho_corasick {
 		typedef typename UniquePtr::pointer		ptr;
 		typedef std::map<CharType, UniquePtr>	map_type;
 		typedef typename map_type::size_type	size_type;
+		typedef std::vector<ptr>				state_collection;
+		typedef std::vector<CharType>			transition_collection;
 		
 	protected:
 		map_type d_map;
@@ -67,15 +69,17 @@ namespace aho_corasick {
 			return false;
 		}
 		
-		template <typename T>
-		void get_states(T &result) const {
+		
+		state_collection get_states() const {
+			state_collection result;
 			for (auto it = d_map.cbegin(); it != d_map.cend(); ++it) {
 				result.push_back(it->second.get());
 			}
 		}
 		
-		template <typename T>
-		void get_transitions(T &result) const {
+		
+		transition_collection get_transitions() const {
+			transition_collection result;
 			for (auto it = d_map.cbegin(); it != d_map.cend(); ++it) {
 				result.push_back(it->first);
 			}
@@ -349,8 +353,6 @@ namespace aho_corasick {
 		typedef std::basic_string<CharType>&        string_ref_type;
 		typedef std::pair<string_type, unsigned>    key_index;
 		typedef std::set<key_index>                 string_collection;
-		typedef std::vector<ptr>                    state_collection;
-		typedef std::vector<CharType>               transition_collection;
 		typedef TransitionMap<CharType, unique_ptr> transition_map;
 
 	private:
@@ -428,16 +430,14 @@ namespace aho_corasick {
 		
 		void freeze() { d_success.freeze(); }
 
-		state_collection get_states() const {
-			state_collection result;
-			d_success.get_states(result);
-			return result;
+		decltype(std::declval<transition_map>().get_states())
+		get_states() const {
+			return d_success.get_states();
 		}
 
-		transition_collection get_transitions() const {
-			transition_collection result;
-			d_success.get_transitions(result);
-			return result;
+		decltype(std::declval<transition_map>().get_transitions())
+		get_transitions() const {
+			return d_success.get_transitions();
 		}
 
 	private:
@@ -742,7 +742,7 @@ namespace aho_corasick {
 
 		void construct_failure_states() {
 			std::queue<state_ptr_type> q;
-			for (auto& depth_one_state : d_root->get_states()) {
+			for (auto depth_one_state : d_root->get_states()) {
 				depth_one_state->set_failure(d_root.get());
 				q.push(depth_one_state);
 			}
